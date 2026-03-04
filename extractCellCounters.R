@@ -1,10 +1,6 @@
 # Function that extracts the counts of marker types from .xml cell counter files
 # generated with imageJ/Fiji cell counter plugin.
-
-library(xml2)
-library(dplyr)
-library(purrr)
-library(tibble)
+# Dependencies: xml2, purrr, dplyr, tibble, tidyr
 
 # Function to count markers in a single XML file
 count_markers <- function(file_path) {
@@ -42,7 +38,7 @@ extractCellCounters <- function(folder_path) {
   
   # Replace NA with 0 for types that exist in some files but not others
   result <- result %>% 
-    mutate(across(-filename, ~ replace_na(.x, 0)))
+    mutate(across(-filename, ~ tidyr::replace_na(.x, 0)))
   
   return(result)
 }

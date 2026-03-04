@@ -10,7 +10,13 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r libraries, echo=FALSE}
-package_list <- c("tidyverse", "readxl", "ggpubr", "lme4", "here", "emmeans", "performance", "interactions", "lmerTest", "DHARMa", "reshape2", "simr")
+package_list <- c(
+  "tidyverse",
+  "xml2",
+  "here",
+  "lme4",
+  "lmerTest"
+)
 
 for (pkg in package_list) {
   suppressWarnings(suppressMessages({
@@ -27,11 +33,6 @@ unlist(package_versions)
 ```
 
 ```{r positive cells}
-library(xml2)
-library(dplyr)
-library(purrr)
-library(tibble)
-
 # Source the functions file (use the correct path)
 source("extractCellCounters.R")
 
