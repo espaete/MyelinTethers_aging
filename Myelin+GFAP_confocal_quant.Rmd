@@ -1,0 +1,102 @@
+---
+title: "Myelin+GFAP confocal quant"
+author: "Erik Späte"
+date: "2025-02-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries, echo=FALSE}
+package_list <- c("tidyverse", "readxl", "ggpubr", "lme4", "here", "emmeans", "performance", "interactions", "lmerTest", "DHARMa", "reshape2", "simr")
+
+for (pkg in package_list) {
+  suppressWarnings(suppressMessages({
+    if (!require(pkg, character.only = TRUE)) {
+      install.packages(pkg, dependencies = TRUE)
+    }
+    library(pkg, character.only = TRUE)
+  }))
+}
+
+# Print current package versions
+package_versions <- lapply(package_list, function(x) paste(x, ":", as.character(packageVersion(x))))
+unlist(package_versions)
+```
+
+```{r positive cells}
+library(xml2)
+library(dplyr)
+library(purrr)
+library(tibble)
+
+# Source the functions file (use the correct path)
+source("extractCellCounters.R")
+
+# Now you can use the functions
+cellCounterResults <- extractCellCounters("Astrocyte_Count/") %>%
+  mutate(
+    Animal = str_remove(filename, "^CellCounter_") %>%  # Remove prefix
+           str_remove("_AlveusRight.*$"),           # Remove suffix
+  .after = filename) %>%
+  dplyr::select(c("Animal", "Type 1")) %>%
+  rename(Astrocytes = 'Type 1')
+#View(cellCounterResults)
+```
+
+```{r load}
+#Imports excel file
+file = here::here("GFAP PLP Particle Quant.csv")
+
+blinding <- read_csv(here::here("renamed_files.csv")) %>%  # First read the file
+  rename(OldName = `Old Name`,  # Then rename columns
+         NewName = `New Name`) %>%
+  mutate(
+    Animal = str_remove(OldName, "_AlveusRight.*$"),
+    Blinding = str_remove(NewName, "^PLP\\+GFAP_aging_confocal_blinded__blinded_") %>%
+      str_remove("\\.tif$")
+  ) %>%
+  select(Animal, Blinding)
+
+z_resolution = 0.7133480
+data <- read.csv(file) %>%
+  mutate(Age = factor(Age)) %>%
+  mutate(Volume = Area * z_resolution) %>%
+  rename(Blinding = Animal) %>%
+  merge(blinding, by = "Blinding") %>%
+  merge(cellCounterResults, by = "Animal") %>%
+  filter(Volume > 0.2)
+
+data_summarized <- data %>%
+  group_by(Blinding, Animal, Age, Cell, Particle) %>%
+  summarise(Volume = sum(Volume), .groups = "drop")
+
+data_summarized_all <- data %>%
+  group_by(Blinding, Animal, Age, Cell, Astrocytes) %>%
+  summarise(Volume = sum(Volume), .groups = "drop") %>%
+  group_by(Blinding, Animal, Age, Astrocytes) %>%
+  summarise(Volume = sum(Volume), 
+            Cell = max(Cell), .groups = "drop")
+
+# Print summarized data
+data_summarized
+data_summarized_all
+```
+
+```{r write data}
+write_csv(data, "data_withThreshold.csv")
+write_csv(data_summarized_all, "data_summarized_all.csv")
+write_csv(data_summarized, "data_summarized.csv")
+write_csv(cellCounterResults, "GFAP_PLP_totalAstrocyteCount.csv")
+```
+
+```{r LMM IPL Area}
+# Fit a Linear Mixer Model
+model <- lmer(log(Volume) ~ Age + (1 | Animal), data = data)
+
+# Results Cell Type
+summary(model) # Check the model summary
+anova(model) # Compute ANOVA
+```
